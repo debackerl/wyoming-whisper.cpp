@@ -1,17 +1,17 @@
 [project]
-name = "wyoming-faster-whisper"
+name = "wyoming-whisper.cpp"
 version = "2.5.0"
-description = "Wyoming Server for Faster Whisper"
+description = "Wyoming Server for whisper.cpp"
 readme = "README.md"
-requires-python = ">=3.8.1,<3.13"
+requires-python = ">=3.8.1"
 license = {text = "MIT"}
 authors = [
-    {name = "Michael Hansen", email = "mike@rhasspy.org"}
+    {name = "Laurent Debacker", email = "deback@gmail.com"}
 ]
-keywords = ["rhasspy", "wyoming", "whisper", "stt"]
+keywords = ["wyoming", "whisper", "stt"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
     "Topic :: Text Processing :: Linguistic",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.7",
@@ -23,11 +23,12 @@ classifiers = [
 ]
 dependencies = [
     "wyoming>=1.5.3",
-    "faster-whisper>=1.1.0,<2"
+    "pywhispercpp>=1.3.3,<2",
+    "soxr>=0.3.1,<1"
 ]
 
 [project.urls]
-Homepage = "http://github.com/rhasspy/wyoming-faster-whisper"
+Homepage = "http://github.com/debackerl/wyoming-whisper.cpp"
 
 [tool.setuptools]
 platforms = ["any"]
@@ -35,11 +36,11 @@ zip-safe  = true
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["wyoming_faster_whisper"]
+include = ["wyoming_whisper_cpp"]
 exclude = ["tests"]
 
 [project.scripts]
-wyoming-faster-whisper = "wyoming_faster_whisper.__main__:run"
+wyoming-whisper-cpp = "wyoming_whisper_cpp.__main__:run"
 
 [build-system]
 requires = ["setuptools>=42", "wheel"]
@@ -60,6 +61,8 @@ disallow_untyped_defs = true
 
 [project.optional-dependencies]
 dev = [
+    "build==1.3.0",
+    "twine==6.1.0",
     "black==22.12.0",
     "flake8==6.0.0",
     "isort==5.11.3",
@@ -67,7 +70,4 @@ dev = [
     "pylint==2.15.9",
     "pytest==7.4.4",
     "pytest-asyncio==0.23.3",
-]
-transformers = [
-    "transformers[torch]==4.52.4",
 ]

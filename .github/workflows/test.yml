@@ -15,6 +15,6 @@ jobs:
           script/setup --dev
       - name: test
         run: |
-          test $(script/run --version) = $(cat wyoming_faster_whisper/VERSION)
+          test $(script/run --version) = $(cat wyoming_whisper_cpp/VERSION)
           script/lint
           script/test

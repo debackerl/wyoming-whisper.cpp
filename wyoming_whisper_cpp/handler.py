@@ -7,7 +7,10 @@ import tempfile
 import wave
 from typing import Optional
 
-import faster_whisper
+import numpy as np
+from pywhispercpp.constants import WHISPER_SAMPLE_RATE
+from pywhispercpp.model import Model
+from soxr import resample
 from wyoming.asr import Transcribe, Transcript
 from wyoming.audio import AudioChunk, AudioStop
 from wyoming.event import Event
@@ -17,14 +20,14 @@ from wyoming.server import AsyncEventHandler
 _LOGGER = logging.getLogger(__name__)
 
 
-class FasterWhisperEventHandler(AsyncEventHandler):
+class WhisperCppEventHandler(AsyncEventHandler):
     """Event handler for clients."""
 
     def __init__(
         self,
         wyoming_info: Info,
         cli_args: argparse.Namespace,
-        model: faster_whisper.WhisperModel,
+        model: Model,
         model_lock: asyncio.Lock,
         *args,
         initial_prompt: Optional[str] = None,
@@ -65,12 +68,36 @@ class FasterWhisperEventHandler(AsyncEventHandler):
             self._wav_file.close()
             self._wav_file = None
 
+            with wave.open(self._wav_path, "rb") as wav_file:
+                max_value = 32768.0 if wav_file.getsampwidth() == 2 else 128.0
+                audio_data = wav_file.readframes(wav_file.getnframes())
+
+                audio_data = np.frombuffer(
+                    audio_data,
+                    dtype=np.int16 if wav_file.getsampwidth() == 2 else np.int8,
+                ).astype(np.float32)
+                audio_data = audio_data.reshape(-1, wav_file.getnchannels())
+                if wav_file.getnchannels() > 1:
+                    pcmf32 = (audio_data[:, 0] + audio_data[:, 1]) / (max_value * 2)
+                else:
+                    pcmf32 = audio_data / max_value
+
+                if wav_file.getframerate() != WHISPER_SAMPLE_RATE:
+                    pcmf32 = resample(
+                        pcmf32, wav_file.getframerate(), WHISPER_SAMPLE_RATE
+                    )
+
             async with self.model_lock:
-                segments, _info = self.model.transcribe(
-                    self._wav_path,
-                    beam_size=self.cli_args.beam_size,
+                segments = self.model.transcribe(
+                    pcmf32,
+                    beam_search={
+                        "beam_size": self.cli_args.beam_size,
+                        "patience": self.cli_args.patience,
+                    }
+                    if self.cli_args.beam_size > 0
+                    else None,
                     language=self._language,
-                    initial_prompt=self.initial_prompt,
+                    initial_prompt=self.initial_prompt or "",
                 )
 
             text = " ".join(segment.text for segment in segments)

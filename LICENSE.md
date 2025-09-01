@@ -1,5 +1,7 @@
 MIT License
 
+Copyright (c) 2025 Laurent Debacker
+
 Copyright (c) 2023 Michael Hansen
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
