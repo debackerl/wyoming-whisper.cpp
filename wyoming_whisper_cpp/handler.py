@@ -5,7 +5,7 @@ import logging
 import os
 import tempfile
 import wave
-from typing import Optional
+from typing import Optional, List
 
 import numpy as np
 from pywhispercpp.constants import WHISPER_SAMPLE_RATE
@@ -41,21 +41,23 @@ class WhisperCppEventHandler(AsyncEventHandler):
         self.model_lock = model_lock
         self.initial_prompt = initial_prompt
         self._language = self.cli_args.language
-        self._wav_dir = tempfile.TemporaryDirectory()
-        self._wav_path = os.path.join(self._wav_dir.name, "speech.wav")
-        self._wav_file: Optional[wave.Wave_write] = None
+        self._raw: Optional[bytearray] = None
+        self._rate: Optional[int] = None
+        self._width: Optional[int] = None
+        self._channels: Optional[int] = None
 
     async def handle_event(self, event: Event) -> bool:
         if AudioChunk.is_type(event.type):
             chunk = AudioChunk.from_event(event)
 
-            if self._wav_file is None:
-                self._wav_file = wave.open(self._wav_path, "wb")
-                self._wav_file.setframerate(chunk.rate)
-                self._wav_file.setsampwidth(chunk.width)
-                self._wav_file.setnchannels(chunk.channels)
+            if self._raw is None:
+                self._rate = chunk.rate
+                self._width = chunk.width
+                self._channels = chunk.channels
+                self._raw = bytearray(chunk.audio)
+            else:
+                self._raw.extend(chunk.audio)
 
-            self._wav_file.writeframes(chunk.audio)
             return True
 
         if AudioStop.is_type(event.type):
@@ -63,29 +65,28 @@ class WhisperCppEventHandler(AsyncEventHandler):
                 "Audio stopped. Transcribing with initial prompt=%s",
                 self.initial_prompt,
             )
-            assert self._wav_file is not None
+            # Concatenate in-memory audio chunks and convert to float32 PCM
+            assert self._rate is not None
 
-            self._wav_file.close()
-            self._wav_file = None
+            max_value = 32768.0 if self._width == 2 else 128.0
 
-            with wave.open(self._wav_path, "rb") as wav_file:
-                max_value = 32768.0 if wav_file.getsampwidth() == 2 else 128.0
-                audio_data = wav_file.readframes(wav_file.getnframes())
+            audio_data = np.frombuffer(
+                self._raw, dtype=np.int16 if self._width == 2 else np.int8
+            ).astype(np.float32)
+            audio_data = audio_data.reshape(-1, self._channels)
+            if self._channels > 1:
+                pcmf32 = (audio_data[:, 0] + audio_data[:, 1]) / (max_value * 2)
+            else:
+                pcmf32 = audio_data / max_value
 
-                audio_data = np.frombuffer(
-                    audio_data,
-                    dtype=np.int16 if wav_file.getsampwidth() == 2 else np.int8,
-                ).astype(np.float32)
-                audio_data = audio_data.reshape(-1, wav_file.getnchannels())
-                if wav_file.getnchannels() > 1:
-                    pcmf32 = (audio_data[:, 0] + audio_data[:, 1]) / (max_value * 2)
-                else:
-                    pcmf32 = audio_data / max_value
+            # Resample if needed
+            if self._rate != WHISPER_SAMPLE_RATE:
+                pcmf32 = resample(pcmf32, self._rate, WHISPER_SAMPLE_RATE)
 
-                if wav_file.getframerate() != WHISPER_SAMPLE_RATE:
-                    pcmf32 = resample(
-                        pcmf32, wav_file.getframerate(), WHISPER_SAMPLE_RATE
-                    )
+            self._raw = None
+            self._rate = None
+            self._width = None
+            self._channels = None
 
             async with self.model_lock:
                 segments = self.model.transcribe(
