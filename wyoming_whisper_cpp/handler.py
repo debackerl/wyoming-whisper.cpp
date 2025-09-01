@@ -2,10 +2,7 @@
 import argparse
 import asyncio
 import logging
-import os
-import tempfile
-import wave
-from typing import Optional, List
+from typing import Optional
 
 import numpy as np
 from pywhispercpp.constants import WHISPER_SAMPLE_RATE
