@@ -1,4 +1,4 @@
-# Wyoming Faster Whisper
+# Wyoming Whisper.cpp
 
 [Wyoming protocol](https://github.com/rhasspy/wyoming) server for the [whisper.cpp](https://github.com/ggml-org/whisper.cpp) speech to text system.
 
