@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.6.0
+
+- Switched to whisper.cpp
+
 ## 2.5.0
 
 - Add support for HuggingFace transformers Whisper models (--use-transformers)
