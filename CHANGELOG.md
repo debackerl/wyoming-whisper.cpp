@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.6.1
+
+- Fixed signal handling for a graceful shutdown
+
 ## 2.6.0
 
 - Switched to whisper.cpp

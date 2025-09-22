@@ -4,6 +4,7 @@ import asyncio
 import logging
 import platform
 import re
+import signal
 from functools import partial
 from typing import Any
 
@@ -16,8 +17,13 @@ from .handler import WhisperCppEventHandler
 
 _LOGGER = logging.getLogger(__name__)
 
+def shutdown_handler(loop: asyncio.AbstractEventLoop, server: AsyncServer) -> None:
+    loop.create_task(server.stop())
+    print("Initiate graceful shutdown")
 
 async def main() -> None:
+    loop = asyncio.get_event_loop()
+
     """Main entry point."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -144,6 +150,9 @@ async def main() -> None:
     _LOGGER.info("Ready")
     model_lock = asyncio.Lock()
 
+    loop.add_signal_handler(signal.SIGTERM, shutdown_handler, loop, server)
+    loop.add_signal_handler(signal.SIGINT, shutdown_handler, loop, server)
+
     await server.run(
         partial(
             WhisperCppEventHandler,
@@ -160,11 +169,10 @@ async def main() -> None:
 
 
 def run() -> None:
-    asyncio.run(main())
-
+    try:
+        asyncio.run(main())
+    except asyncio.CancelledError:
+        pass
 
 if __name__ == "__main__":
-    try:
-        run()
-    except KeyboardInterrupt:
-        pass
+    run()
